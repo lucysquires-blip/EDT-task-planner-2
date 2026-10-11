@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en-GB" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>EDT Task Planner</title>
+<style>
+:root{
+  --bg:#f6f3ff; --ink:#24204a; --muted:#6b6790; --card:#ffffff; --line:#e6e0ff;
+  --purple:#7c4dff; --pink:#ff4fa3; --orange:#ff9f1c; --yellow:#ffd23f;
+  --green:#2ec4b6; --blue:#3a86ff; --red:#ff5964;
+  --shadow:0 8px 24px rgba(76,48,170,.12); --radius:18px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#16132b; --ink:#f3f0ff; --muted:#a9a3d1; --card:#221d40; --line:#352d63; --shadow:0 8px 24px rgba(0,0,0,.35); }
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;
+  background-image:radial-gradient(circle at 10% 10%,rgba(255,79,163,.12) 0 160px,transparent 161px),
+  radial-gradient(circle at 90% 20%,rgba(58,134,255,.12) 0 200px,transparent 201px),
+  radial-gradient(circle at 50% 100%,rgba(255,210,63,.15) 0 240px,transparent 241px);background-attachment:fixed}
+button{font:inherit;cursor:pointer}
+a{color:var(--blue)}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:18px 28px;
+  background:linear-gradient(120deg,var(--purple),var(--pink) 55%,var(--orange));color:#fff;box-shadow:var(--shadow)}
+.logo{font-size:34px;animation:bob 3s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-5px) rotate(-6deg)}}
+header h1{margin:0;font-size:24px}
+header small{display:block;opacity:.92;font-size:13px}
+.spacer{flex:1}
+.who{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.18);padding:6px 8px 6px 14px;border-radius:999px}
+.who select{border:0;border-radius:999px;padding:6px 10px;font:inherit;background:#fff;color:#24204a;max-width:200px}
+.hbtn{background:rgba(255,255,255,.2);color:#fff;border:2px solid rgba(255,255,255,.5);border-radius:999px;padding:7px 14px;font-weight:600;text-decoration:none}
+.hbtn:hover{background:rgba(255,255,255,.35)}
+.sync{font-size:12px;padding:5px 10px;border-radius:999px;background:rgba(0,0,0,.18)}
+main{max-width:1360px;margin:0 auto;padding:22px 24px 80px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px}
+.stat{background:var(--card);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);display:flex;gap:14px;align-items:center;border-bottom:5px solid var(--c)}
+.stat .ic{font-size:30px;width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:color-mix(in srgb,var(--c) 18%,transparent)}
+.stat b{font-size:26px;display:block;line-height:1}
+.stat span{color:var(--muted);font-size:13px}
+.tabs{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.tab{border:0;background:var(--card);color:var(--ink);padding:10px 18px;border-radius:999px;font-weight:700;box-shadow:var(--shadow);transition:transform .15s}
+.tab:hover{transform:translateY(-2px)}
+.tab.active{background:var(--ink);color:var(--bg)}
+.tab .count{display:inline-block;min-width:22px;padding:1px 7px;margin-inline-start:6px;border-radius:999px;background:var(--pink);color:#fff;font-size:12px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+.toolbar input,.toolbar select{border:2px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:9px 12px;font:inherit}
+.toolbar input{min-width:220px;flex:1}
+.addbtn{border:0;border-radius:14px;padding:11px 20px;font-weight:800;color:#fff;background:linear-gradient(120deg,var(--green),var(--blue));box-shadow:var(--shadow)}
+.addbtn:hover{filter:brightness(1.08)}
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;align-items:start}
+.col{background:color-mix(in srgb,var(--card) 70%,transparent);border-radius:22px;padding:14px;min-height:200px;border:2px dashed transparent;transition:border-color .15s,background .15s}
+.col.drag{border-color:var(--c);background:color-mix(in srgb,var(--c) 12%,var(--card))}
+.col h2{display:flex;align-items:center;gap:8px;margin:2px 4px 14px;font-size:17px}
+.col h2 .pill{margin-inline-start:auto;background:var(--c);color:#fff;border-radius:999px;padding:2px 10px;font-size:13px}
+.col h2 .dot{font-size:22px}
+.task{background:var(--card);border-radius:16px;padding:14px 14px 12px;margin-bottom:12px;box-shadow:var(--shadow);border-inline-start:7px solid var(--tc);position:relative;animation:pop .25s ease-out}
+.task[draggable="true"]{cursor:grab}
+.task:hover{transform:translateY(-2px);transition:transform .15s}
+.task.urgent::after{content:"🔥";position:absolute;top:-10px;inset-inline-end:-6px;font-size:22px;animation:bob 1.6s ease-in-out infinite}
+@keyframes pop{from{transform:scale(.92);opacity:0}}
+.task .top{display:flex;gap:10px;align-items:flex-start}
+.task .emo{font-size:26px;width:44px;height:44px;flex:none;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--tc) 20%,transparent)}
+.task h3{margin:0 0 4px;font-size:15px;line-height:1.35;word-break:break-word}
+.task .sub{color:var(--muted);font-size:12.5px}
+.warn{margin-top:8px;font-size:12.5px;background:#fff4d6;color:#7a5200;border-radius:10px;padding:6px 9px;line-height:1.4}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.tag{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--line);color:var(--ink)}
+.tag.hot{background:#ffe0e3;color:#c41d2b}.tag.asap{background:#fff1cc;color:#9a6a00}.tag.chill{background:#d9f7f3;color:#137a70}
+.tag.rt{background:#e3ecff;color:#1f4fb8}.tag.req{background:#f2e6ff;color:#6a2fd6}
+.tag.late{background:var(--red);color:#fff}
+.actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.act{border:0;border-radius:10px;padding:6px 10px;font-size:12.5px;font-weight:700;background:var(--line);color:var(--ink);text-decoration:none}
+.act:hover{filter:brightness(.95)}
+.act.claim{background:linear-gradient(120deg,var(--orange),var(--pink));color:#fff}
+.act.done{background:var(--green);color:#fff}
+.avatars{display:flex;align-items:center;gap:4px;margin-top:10px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+.avatar{width:30px;height:30px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px;font-weight:800;color:#fff;flex:none;border:2px solid var(--card)}
+.empty{text-align:center;color:var(--muted);padding:26px 10px;font-size:14px}
+.empty .big{font-size:42px;display:block;margin-bottom:6px}
+.people{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px}
+.person{background:var(--card);border-radius:22px;padding:16px;box-shadow:var(--shadow)}
+.person .ph{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.person .ph .avatar{width:46px;height:46px;font-size:16px}
+.bar{height:10px;border-radius:999px;background:var(--line);overflow:hidden;margin:4px 0 12px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:999px;transition:width .5s}
+.mini{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;background:color-mix(in srgb,var(--tc) 12%,transparent);margin-bottom:6px;font-size:13px;cursor:pointer;border:0;width:100%;text-align:start;color:var(--ink)}
+.mini span.t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini.isdone{opacity:.55;text-decoration:line-through}
+dialog{border:0;border-radius:24px;padding:0;width:min(640px,95vw);background:var(--card);color:var(--ink);box-shadow:0 30px 80px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(30,20,70,.55);backdrop-filter:blur(3px)}
+.mh{padding:18px 22px;background:linear-gradient(120deg,var(--blue),var(--purple));color:#fff;display:flex;align-items:center;gap:10px}
+.mh h2{margin:0;font-size:19px}
+.mb{padding:18px 22px;display:grid;gap:12px;max-height:68vh;overflow:auto}
+.mb label{font-weight:700;font-size:13px;display:grid;gap:5px}
+.mb input,.mb textarea,.mb select{border:2px solid var(--line);border-radius:12px;padding:9px 11px;font:inherit;background:var(--bg);color:var(--ink)}
+.mb textarea{min-height:64px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:2px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:5px 11px 5px 5px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:6px}
+.chip .avatar{width:24px;height:24px;font-size:10px;border:0}
+.chip.sel{border-color:var(--purple);background:color-mix(in srgb,var(--purple) 16%,var(--bg))}
+.info{background:var(--bg);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.5;display:grid;gap:6px}
+.info b{color:var(--muted);font-weight:700}
+.mf{display:flex;justify-content:flex-end;gap:10px;padding:14px 22px 20px;flex-wrap:wrap}
+.btn{border:0;border-radius:12px;padding:10px 18px;font-weight:800;text-decoration:none}
+.btn.primary{background:linear-gradient(120deg,var(--green),var(--blue));color:#fff}
+.btn.ghost{background:var(--line);color:var(--ink)}
+.btn.link{background:transparent;color:var(--blue);margin-inline-end:auto;padding-inline:0}
+.note{font-size:12.5px;color:var(--muted);background:var(--bg);border-radius:12px;padding:10px 12px;line-height:1.5}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(120px);background:var(--ink);color:var(--bg);padding:12px 20px;border-radius:999px;font-weight:700;box-shadow:var(--shadow);transition:transform .3s;z-index:99}
+.toast.show{transform:translateX(-50%) translateY(0)}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:98}
+.hidden{display:none!important}
+@media (max-width:640px){header{padding:14px}.row{grid-template-columns:1fr}main{padding:16px 12px 80px}}
+.local{--tc:#8ac926}
+.badge-local{background:#eaf7d6;color:#3d6b00}
+.done-strip{opacity:.7}
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<header>
+  <div class="logo">📚</div>
+  <div><h1>EDT Task Planner</h1><small>New reviews flow in from SharePoint · tick them off here ✨</small></div>
+  <div class="spacer"></div>
+  <span class="sync" id="syncState">⚪ Not synced</span>
+  <button class="hbtn" id="refreshBtn" type="button">🔄 Refresh</button>
+  <a class="hbtn" id="listLink" target="_blank" rel="noopener">📋 Open list</a>
+  <div class="who"><span>🙋 I am</span><select id="meSelect" aria-label="Who are you?"></select></div>
+  <button class="hbtn" id="settingsBtn" type="button" aria-label="Settings">⚙️</button>
+</header>
+
+<main>
+  <section class="stats" id="stats"></section>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-view="mine" type="button">🦸 My Tasks<span class="count" id="cMine">0</span></button>
+    <button class="tab" data-view="team" type="button">🗺️ Team Tasks<span class="count" id="cTeam">0</span></button>
+    <button class="tab" data-view="people" type="button">👥 By Person</button>
+    <button class="tab" data-view="done" type="button">🏁 Recently Completed</button>
+  </nav>
+
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="🔍 Search chapter, requester, comments…" aria-label="Search">
+    <select id="filterService" aria-label="FC Service filter"><option value="">🏢 All services</option></select>
+    <select id="filterUrgent" aria-label="Urgency filter">
+      <option value="">🎚️ Any urgency</option><option value="urgent">🔥 Urgent only</option><option value="asap">⚡ ASAP</option><option value="date">📅 Specific date</option><option value="chill">🐢 When time allows</option>
+    </select>
+    <button class="addbtn" id="addBtn" type="button">➕ My Own To-do</button>
+  </div>
+
+  <section id="view"></section>
+</main>
+
+<!-- Details (read-only) -->
+<dialog id="detDlg">
+  <div class="mh"><span id="detEmoji" style="font-size:26px">📄</span><h2 id="detTitle">Review details</h2></div>
+  <div class="mb"><div class="info" id="detInfo"></div></div>
+  <div class="mf">
+    <a class="btn link" id="spLink" target="_blank" rel="noopener">↗️ Open in SharePoint</a>
+    <button class="btn ghost" type="button" id="detClose">Close</button>
+    <button class="btn primary" type="button" id="detDone">✅ Mark complete</button>
+  </div>
+</dialog>
+
+<!-- Own to-do (browser only) -->
+<dialog id="todoDlg">
+  <form method="dialog" id="todoForm">
+    <div class="mh"><span style="font-size:26px">📝</span><h2 id="todoTitle">My own to-do</h2></div>
+    <div class="mb">
+      <div class="note">Personal to-dos are saved on this device only. They aren't added to the SharePoint list.</div>
+      <label>✏️ What needs doing?<input id="tTitle" required maxlength="140"></label>
+      <div class="row">
+        <label>📅 Due date<input id="tDue" type="date"></label>
+        <label>🔥 Urgent?<select id="tUrgent"><option>No</option><option>Yes</option></select></label>
+      </div>
+      <label>💬 Notes<textarea id="tNotes"></textarea></label>
+    </div>
+    <div class="mf">
+      <button class="btn ghost hidden" type="button" id="tDelete" style="margin-inline-end:auto">🗑️ Delete</button>
+      <button class="btn ghost" type="button" id="tCancel">Cancel</button>
+      <button class="btn primary" type="submit">💾 Save</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Settings -->
+<dialog id="setDlg">
+  <form method="dialog" id="setForm">
+    <div class="mh"><span style="font-size:26px">⚙️</span><h2>Connection settings</h2></div>
+    <div class="mb">
+      <div class="note">Paste the HTTP URLs from the two Power Automate flows. These settings apply to this browser only. Leave both blank to see <b>demo mode</b>.</div>
+      <label>📥 "Get reviews" flow URL<input id="sGet" placeholder="https://…"></label>
+      <label>✅ "Mark complete" flow URL<input id="sDone" placeholder="https://…"></label>
+      <label>⏱️ Auto-refresh every (minutes, 0 = off)<input id="sRefresh" type="number" min="0" max="60"></label>
+    </div>
+    <div class="mf">
+      <button class="btn ghost" type="button" id="setCancel">Cancel</button>
+      <button class="btn primary" type="submit">✅ Save</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   CONFIG — paste your two Power Automate HTTP URLs here (or use ⚙️).
+   ===================================================================== */
+const DEFAULT_CONFIG = {
+  getUrl: "",        // Flow 1 "EDT Planner – Get reviews"
+  completeUrl: "",   // Flow 2 "EDT Planner – Mark complete"
+  refreshMinutes: 2,
+  listUrl: "https://chanceryventures.sharepoint.com/Content%20Team/Lists/Content%20reviews",
+  spHost: "https://chanceryventures.sharepoint.com",
+  // Choices in the list's "Allocations" column
+  team: ["Fadi BouHadir","Jake Widjaya","Louise Heath","Janelle Lau","Patrick McGarrahan","Nikita Kandola","Rebecca Liesse",
+         "Esmée Pham","Annabel Maltman","Srishti Garg","Maeling Booth","Ariana Jahromi","Ke Xuan Tee","Arthur Adams",
+         "Celine Habbal","Ishaan Bhardwaj","Sienna Pearson","Rhiannon Hopcroft","Sami Baloch","Eleanor Razavi","Lucy Squires"],
+  services: ["Corporate","Employment","R&I","Disputes"]
+};
+
+/* ---------------- state ---------------- */
+const LS = { cfg:"edt.config", me:"edt.me", todos:"edt.todos", demo:"edt.demo" };
+const saved = JSON.parse(localStorage.getItem(LS.cfg) || "{}");
+const cfg = Object.assign({}, DEFAULT_CONFIG);
+["getUrl","completeUrl","refreshMinutes"].forEach(k => { if (saved[k] !== undefined && saved[k] !== "") cfg[k] = saved[k]; });
+let reviews = [];
+let todos = JSON.parse(localStorage.getItem(LS.todos) || "[]");
+let me = localStorage.getItem(LS.me) || "";
+let view = "mine";
+let detailId = null, editTodo = null, refreshTimer = null;
+const pending = new Set();   // review IDs being completed right now
+
+const SERVICE_STYLE = {
+  "Corporate":{emoji:"💼",colour:"#3a86ff"}, "Employment":{emoji:"👥",colour:"#ff4fa3"},
+  "R&I":{emoji:"🔬",colour:"#2ec4b6"}, "Disputes":{emoji:"⚖️",colour:"#ff9f1c"}
+};
+const AV_COLOURS = ["#7c4dff","#ff4fa3","#ff9f1c","#2ec4b6","#3a86ff","#ff5964","#8ac926","#c77dff","#f15bb5","#00bbf9"];
+const CONF_COLOURS = ["#7c4dff","#ff4fa3","#ff9f1c","#ffd23f","#2ec4b6","#3a86ff","#ff5964","#8ac926"];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const initials = n => (n||"?").split(/\s+/).filter(Boolean).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+const avColour = n => { let h=0; for (const ch of (n||"")) h=(h*31+ch.charCodeAt(0))>>>0; return AV_COLOURS[h%AV_COLOURS.length]; };
+const todayISO = () => new Date().toISOString().slice(0,10);
+const isLive = () => !!(cfg.getUrl && cfg.completeUrl);
+const first = n => (n||"").split(" ")[0];
+const trunc = (s,n) => s.length > n ? s.slice(0,n-1) + "…" : s;
+const fmt = iso => new Date(iso+"T00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+const meaningful = s => !!s && !/^(n\/?a|no|none|-)\.?$/i.test(String(s).trim());
+
+/* ---------------- SharePoint item -> review ---------------- */
+const val = v => v == null ? "" : Array.isArray(v) ? v.map(val).filter(Boolean)
+  : typeof v === "object" ? (v.Value ?? v.value ?? v.DisplayName ?? "") : String(v);
+function htmlToText(h){ if (!h) return ""; const d = new DOMParser().parseFromString(String(h),"text/html"); return (d.body.textContent||"").replace(/\s+/g," ").trim(); }
+function htmlLinks(h){
+  if (!h) return [];
+  const d = new DOMParser().parseFromString(String(h),"text/html");
+  return [...d.querySelectorAll("a[href]")].map(a => {
+    let href = a.getAttribute("href") || ""; if (href.startsWith("/")) href = cfg.spHost + href;
+    return /^https:\/\//i.test(href) ? {href, text:(a.textContent||"Link").trim()} : null;
+  }).filter(Boolean);
+}
+function parseDate(s){
+  if (!s) return ""; s = String(s).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  if (m){ const y = m[3].length===2 ? "20"+m[3] : m[3]; return `${y}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`; }
+  return "";
+}
+const shortReview = r => !r ? "" : /^copy/i.test(r) ? "Copy edit" : /^top/i.test(r) ? "Top up" : /^specific/i.test(r) ? "Specific" : r;
+function normalise(t){
+  const svc = val(t.FC_x0020_Service);
+  const style = SERVICE_STYLE[svc] || {emoji:"📄",colour:"#7c4dff"};
+  const specificDate = val(t.Datedeadline);
+  return {
+    kind:"review", id:String(t.ID ?? t.id ?? ""),
+    initials: val(t.Title).trim(), email: val(t.Email),
+    chapter: val(t.Chapter_x002f_Section_x002f_Flav) || "(no chapter given)",
+    service: svc, contentType: val(t.Q_x0026_A_x0020_or_x0020_precede), reviewType: val(t.Review_x0020_type),
+    urgent: val(t.Urgent) === "Yes", deadline: val(t.Deadline), specificDate, due: parseDate(specificDate),
+    comments: val(t.Furthercomments), doNot: val(t.DONOT), breadth: val(t.Breadth_x003f_),
+    partial: htmlToText(val(t.If_x0020_partial_x002c__x0020_wh)), draftOrPublished: val(t.Draftorpublished_x003f_),
+    requests: [].concat(val(t.Specificreviewrequests)).filter(meaningful),
+    links: [...htmlLinks(val(t.Compare)), ...htmlLinks(val(t.Offlineversion))],
+    allocations: [].concat(val(t.Alllocations)).filter(Boolean),
+    done: val(t.Porgress) === "Complete",
+    created: val(t.Created), modified: val(t.Modified),
+    emoji: style.emoji, colour: style.colour
+  };
+}
+
+/* ---------------- demo data (fictional) ---------------- */
+function demoItems(){
+  const d = n => { const x = new Date(); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); };
+  const T = cfg.team, now = new Date().toISOString();
+  return [
+    {ID:9001,Title:"AB",Chapter_x002f_Section_x002f_Flav:"11B Age FF v 3.02",FC_x0020_Service:"Employment",Review_x0020_type:"Copy edit",Urgent:"Yes",Deadline:"ASAP",Specificreviewrequests:["Spelling, punctuation & grammar"],Alllocations:[],Created:now},
+    {ID:9002,Title:"CD",Chapter_x002f_Section_x002f_Flav:"20F Shadow directors skim",FC_x0020_Service:"R&I",Review_x0020_type:"Top up",Urgent:"No",Deadline:"When time allows",Alllocations:[T[12]],Created:now},
+    {ID:9003,Title:"EF",Chapter_x002f_Section_x002f_Flav:"5F Part 18 request – precedent letter",FC_x0020_Service:"Disputes",Review_x0020_type:"Specific",Urgent:"No",Deadline:"Specific date (see below)",Datedeadline:d(4),Alllocations:[T[15]],Furthercomments:"Please check citations only.",Created:now},
+    {ID:9004,Title:"GH",Chapter_x002f_Section_x002f_Flav:"23G FF v 1.11",FC_x0020_Service:"Corporate",Review_x0020_type:"Copy edit",Urgent:"No",Deadline:"Specific date (see below)",Datedeadline:d(-1),Alllocations:[T[20]],DONOT:"Please don't change the red notes – they're for round 2.",Created:now},
+    {ID:9005,Title:"IJ",Chapter_x002f_Section_x002f_Flav:"15A Whistleblowing FF – Qs 66–72 only",FC_x0020_Service:"Employment",Review_x0020_type:"Top up",Urgent:"Yes",Deadline:"ASAP",Alllocations:[T[20],T[13]],Created:now},
+    {ID:9006,Title:"KL",Chapter_x002f_Section_x002f_Flav:"Disciplinary precedents – house style",FC_x0020_Service:"Employment",Review_x0020_type:"Copy edit",Urgent:"No",Deadline:"When time allows",Alllocations:[T[1]],Created:now},
+    {ID:9007,Title:"MN",Chapter_x002f_Section_x002f_Flav:"7F PSC v 8.55",FC_x0020_Service:"Corporate",Review_x0020_type:"Copy edit",Urgent:"No",Deadline:"ASAP",Alllocations:[T[20]],Porgress:"Complete",Created:now}
+  ];
+}
+
+/* ---------------- talking to Power Automate ---------------- */
+async function load(silent){
+  if (!isLive()){
+    if (!localStorage.getItem(LS.demo)) localStorage.setItem(LS.demo, JSON.stringify(demoItems()));
+    reviews = JSON.parse(localStorage.getItem(LS.demo)).map(normalise);
+    setSync("🟡 Demo mode – sample data");
+    render(); return;
+  }
+  if (!silent) setSync("🔄 Syncing…");
+  try{
+    const r = await fetch(cfg.getUrl, {method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    const list = Array.isArray(data) ? data : (data.tasks || data.value || []);
+    const fresh = list.map(normalise);
+    // keep anything we've just ticked off showing as done until SharePoint catches up
+    fresh.forEach(x => { if (pending.has(x.id)) x.done = true; });
+    reviews = fresh;
+    setSync("🟢 Synced " + new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}));
+  }catch(e){
+    console.error(e);
+    setSync("🔴 Sync failed");
+    toast("😬 Couldn't reach SharePoint – check the flow URLs in ⚙️");
+  }
+  render();
+}
+
+async function markComplete(id){
+  const t = reviews.find(x => x.id === id);
+  if (!t || t.done || pending.has(id)) return;
+  t.done = true; pending.add(id); render();          // instant feedback
+  confetti(); toast("🏆 Nice one! Marking it complete in SharePoint…");
+  if (!isLive()){
+    const raw = JSON.parse(localStorage.getItem(LS.demo) || "[]");
+    raw.forEach(x => { if (String(x.ID) === id) x.Porgress = "Complete"; });
+    localStorage.setItem(LS.demo, JSON.stringify(raw));
+    pending.delete(id); return;
+  }
+  try{
+    const r = await fetch(cfg.completeUrl, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({id: Number(id)})});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    toast("✅ Marked complete in SharePoint");
+    setTimeout(() => { pending.delete(id); }, 60000);
+  }catch(e){
+    console.error(e);
+    pending.delete(id); t.done = false; render();
+    setSync("🔴 Save failed");
+    toast("😬 Couldn't update SharePoint – the task is still open");
+  }
+}
+function setSync(s){ $("#syncState").textContent = s; }
+
+/* ---------------- own to-dos (this browser only) ---------------- */
+const saveTodos = () => localStorage.setItem(LS.todos, JSON.stringify(todos));
+const myTodos = () => todos.filter(t => t.owner === me);
+
+/* ---------------- rendering ---------------- */
+const urgencyKey = t => !t.deadline ? "" : t.deadline.startsWith("ASAP") ? "asap" : t.deadline.startsWith("Specific") ? "date" : t.deadline.startsWith("When") ? "chill" : "";
+function filtered(list){
+  const q = $("#search").value.trim().toLowerCase();
+  const s = $("#filterService").value, u = $("#filterUrgent").value;
+  return list.filter(t =>
+    (!q || [t.chapter,t.initials,t.email,t.comments,t.service,t.reviewType,(t.allocations||[]).join(" ")].join(" ").toLowerCase().includes(q)) &&
+    (!s || t.service === s) &&
+    (!u || (u === "urgent" ? t.urgent : urgencyKey(t) === u)));
+}
+const sortTasks = list => list.sort((a,b) =>
+  (b.urgent - a.urgent) || (a.due||"9999").localeCompare(b.due||"9999") ||
+  ((urgencyKey(b)==="asap") - (urgencyKey(a)==="asap")) || (a.created||"").localeCompare(b.created||""));
+const isLate = t => !t.done && t.due && t.due < todayISO();
+function deadlineTag(t){
+  const k = urgencyKey(t);
+  if (k === "date" || (t.kind === "todo" && t.due)){
+    if (!t.due) return `<span class="tag">📅 ${esc(t.specificDate || "Date TBC")}</span>`;
+    if (isLate(t)) return `<span class="tag late">⏰ Overdue · ${fmt(t.due)}</span>`;
+    return `<span class="tag">${t.due===todayISO()?"📍 Due today":"📅 "+fmt(t.due)}</span>`;
+  }
+  if (k === "asap") return `<span class="tag asap">⚡ ASAP</span>`;
+  if (k === "chill") return `<span class="tag chill">🐢 When time allows</span>`;
+  return "";
+}
+const avatar = n => `<span class="avatar" title="${esc(n)}" style="background:${avColour(n)}">${esc(initials(n))}</span>`;
+
+function reviewCard(t){
+  const mine = t.allocations.includes(me);
+  const busy = pending.has(t.id);
+  const acts = [];
+  if (!t.done) acts.push(`<button class="act done" data-act="complete" data-id="${esc(t.id)}" type="button">✅ Mark complete</button>`);
+  else acts.push(`<span class="tag chill">${busy ? "⏳ Saving…" : "🏁 Complete"}</span>`);
+  acts.push(`<button class="act" data-act="open" data-id="${esc(t.id)}" type="button">🔎 Details</button>`);
+  const tags = [
+    t.reviewType ? `<span class="tag rt">✍️ ${esc(shortReview(t.reviewType))}</span>` : "",
+    deadlineTag(t),
+    ...t.requests.slice(0,2).map(r => `<span class="tag req">🎯 ${esc(trunc(r,26))}</span>`),
+    t.requests.length > 2 ? `<span class="tag req">+${t.requests.length-2} more</span>` : ""
+  ].join("");
+  return `<article class="task ${t.urgent && !t.done ? "urgent" : ""} ${t.done ? "done-strip" : ""}" style="--tc:${t.colour}">
+    <div class="top"><div class="emo">${t.emoji}</div>
+      <div><h3>${esc(trunc(t.chapter,140))}</h3><div class="sub">📨 ${esc(t.initials||"?")} · ${esc(t.service||"No service")}</div></div></div>
+    ${meaningful(t.doNot) ? `<div class="warn">⚠️ ${esc(trunc(t.doNot,140))}</div>` : ""}
+    <div class="tags">${tags}</div>
+    <div class="avatars">${t.allocations.length ? t.allocations.map(avatar).join("") + `<span style="margin-inline-start:4px">${esc(t.allocations.map(first).join(", "))}${mine?" (incl. you)":""}</span>` : "🎁 Not allocated yet"}</div>
+    <div class="actions">${acts.join("")}</div>
+  </article>`;
+}
+function todoCard(t){
+  return `<article class="task ${t.urgent && !t.done ? "urgent" : ""} ${t.done ? "done-strip" : ""}" style="--tc:#8ac926">
+    <div class="top"><div class="emo">📝</div><div><h3>${esc(t.title)}</h3>${t.notes ? `<div class="sub">${esc(trunc(t.notes,160))}</div>` : ""}</div></div>
+    <div class="tags"><span class="tag badge-local">📱 My own to-do</span>${deadlineTag(t)}</div>
+    <div class="actions">
+      ${t.done ? `<button class="act" data-act="tundo" data-id="${esc(t.id)}" type="button">🔁 Reopen</button>` : `<button class="act done" data-act="tdone" data-id="${esc(t.id)}" type="button">✅ Done</button>`}
+      <button class="act" data-act="tedit" data-id="${esc(t.id)}" type="button">✏️ Edit</button>
+    </div>
+  </article>`;
+}
+const card = t => t.kind === "todo" ? todoCard(t) : reviewCard(t);
+const empty = (icon,msg) => `<div class="empty"><span class="big">${icon}</span>${msg}</div>`;
+const grid = list => `<div class="board">${list.map(card).join("")}</div>`;
+
+function render(){
+  const open = reviews.filter(t => !t.done);
+  const mineOpen = me ? open.filter(t => t.allocations.includes(me)) : [];
+  const mineDone = me ? reviews.filter(t => t.done && t.allocations.includes(me)) : [];
+  const todosOpen = myTodos().filter(t => !t.done);
+  $("#cMine").textContent = mineOpen.length + todosOpen.length;
+  $("#cTeam").textContent = open.length;
+
+  const stats = [
+    ["🦸","My open reviews", mineOpen.length, "#7c4dff"],
+    ["📝","My own to-dos", todosOpen.length, "#8ac926"],
+    ["🏆","I've completed*", mineDone.length, "#ffd23f"],
+    ["📚","Team open", open.length, "#3a86ff"],
+    ["🔥","Urgent & open", open.filter(t=>t.urgent).length, "#ff5964"],
+    ["⏰","Overdue", open.filter(isLate).length, "#ff9f1c"]
+  ];
+  $("#stats").innerHTML = stats.map(([i,l,v,c]) => `<div class="stat" style="--c:${c}"><div class="ic">${i}</div><div><b>${v}</b><span>${l}</span></div></div>`).join("");
+
+  let html = "";
+  if (view === "mine"){
+    if (!me) html = empty("🙋","Pick your name from <b>I am</b> at the top to see your tasks.");
+    else {
+      const list = sortTasks(filtered([...mineOpen, ...todosOpen]));
+      html = list.length ? grid(list) : empty("🌈","Nothing on your plate. Time for a cuppa ☕");
+      const doneMine = [...mineDone, ...myTodos().filter(t=>t.done)];
+      if (doneMine.length) html += `<h2 style="margin:26px 4px 12px;font-size:17px">🏁 Recently completed by you</h2>` + grid(filtered(doneMine));
+    }
+  } else if (view === "team"){
+    const list = sortTasks(filtered(open));
+    html = list.length ? grid(list) : empty("🎉","No open reviews. Legends!");
+  } else if (view === "done"){
+    const list = filtered(reviews.filter(t => t.done)).sort((a,b) => (b.modified||"").localeCompare(a.modified||""));
+    html = list.length ? grid(list) : empty("🌱","No completed reviews in the last 30 days yet.");
+  } else {
+    const names = [...new Set([...cfg.team, ...open.flatMap(t=>t.allocations)])];
+    const unalloc = filtered(open.filter(t => !t.allocations.length));
+    const people = names.map(n => ({n, theirs: sortTasks(filtered(reviews.filter(t => t.allocations.includes(n))))}))
+      .map(p => Object.assign(p, {openCount: p.theirs.filter(t=>!t.done).length}))
+      .sort((a,b) => (b.n===me)-(a.n===me) || b.openCount-a.openCount || a.n.localeCompare(b.n));
+    const block = (head, items, sub) => `<div class="person"><div class="ph">${head}</div>${sub}${items || empty("🏖️","Nothing open")}</div>`;
+    const mini = t => `<button type="button" class="mini ${t.done?"isdone":""}" data-act="open" data-id="${esc(t.id)}" style="--tc:${t.colour}">${t.emoji} <span class="t">${esc(t.chapter)}</span> ${t.urgent&&!t.done?"🔥":""}${t.done?"🏁":"📋"}</button>`;
+    html = `<div class="people">` +
+      (unalloc.length ? block(`<span class="avatar" style="background:#b8b3d6">🎁</span><div><b>Not allocated yet</b><div style="font-size:12.5px;color:var(--muted)">${unalloc.length} open</div></div>`, unalloc.map(mini).join(""), "") : "") +
+      people.map(({n,theirs,openCount}) => {
+        const d = theirs.length - openCount, pct = theirs.length ? Math.round(d/theirs.length*100) : 0;
+        return block(`${avatar(n)}<div><b>${esc(n)}${n===me?" (you)":""}</b><div style="font-size:12.5px;color:var(--muted)">${openCount} open · ${d} complete*</div></div>`,
+          theirs.sort((a,b)=>a.done-b.done).map(mini).join(""), `<div class="bar"><i style="width:${pct}%"></i></div>`);
+      }).join("") + `</div>`;
+  }
+  html += `<p class="note" style="margin-top:18px">* Completed counts cover reviews marked complete in the last 30 days. Allocations are managed in SharePoint as usual.</p>`;
+  $("#view").innerHTML = html;
+}
+
+/* ---------------- clicks ---------------- */
+$("#view").addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const id = b.dataset.id, a = b.dataset.act;
+  if (a === "open") openDetails(id);
+  if (a === "complete") confirmComplete(id);
+  if (a === "tdone" || a === "tundo"){
+    const t = todos.find(x => x.id === id); if (!t) return;
+    t.done = a === "tdone"; saveTodos(); render();
+    if (t.done){ confetti(); toast("🏆 To-do smashed!"); }
+  }
+  if (a === "tedit") openTodo(todos.find(x => x.id === id));
+});
+function confirmComplete(id){
+  const t = reviews.find(x => x.id === id); if (!t) return;
+  if (confirm(`Mark "${trunc(t.chapter,80)}" as complete in SharePoint?`)) markComplete(id);
+}
+
+/* ---------------- details ---------------- */
+function openDetails(id){
+  const t = reviews.find(x => x.id === id); if (!t) return;
+  detailId = id;
+  const rows = [
+    ["📖 Chapter", esc(t.chapter)],
+    ["📨 Requested by", [t.initials, t.email].filter(Boolean).map(esc).join(" · ")],
+    ["🗓️ Submitted", t.created ? new Date(t.created).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}) : ""],
+    ["🏢 Service", esc(t.service)], ["✍️ Review type", esc(t.reviewType)],
+    ["⏱️ Deadline", esc([t.deadline, t.specificDate].filter(Boolean).join(" – "))],
+    ["🔥 Urgent", t.urgent ? "Yes" : ""],
+    ["📏 Breadth", esc(t.breadth)], ["✂️ Which part", esc(t.partial)],
+    ["📰 Draft or published", esc(t.draftOrPublished)],
+    ["🎯 Specific requests", t.requests.map(esc).join(", ")],
+    ["⚠️ Do not", meaningful(t.doNot) ? esc(t.doNot) : ""],
+    ["💬 Further comments", esc(t.comments)],
+    ["👥 Allocated to", esc(t.allocations.join(", "))],
+    ["🔗 Files", t.links.map(l => `<a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.text)}</a>`).join(" · ")]
+  ].filter(r => r[1] && meaningful(String(r[1])));
+  $("#detEmoji").textContent = t.emoji;
+  $("#detTitle").textContent = t.done ? "Review details · 🏁 Complete" : "Review details";
+  $("#detInfo").innerHTML = rows.map(([k,v]) => `<div><b>${k}:</b> ${v}</div>`).join("");
+  $("#spLink").href = cfg.listUrl + "/DispForm.aspx?ID=" + encodeURIComponent(t.id);
+  $("#spLink").classList.toggle("hidden", !isLive());
+  $("#detDone").classList.toggle("hidden", t.done);
+  $("#detDlg").showModal();
+}
+$("#detClose").addEventListener("click", () => $("#detDlg").close());
+$("#detDone").addEventListener("click", () => { $("#detDlg").close(); confirmComplete(detailId); });
+
+/* ---------------- own to-do modal ---------------- */
+function openTodo(t){
+  if (!me){ toast("🙋 Pick your name at the top first"); return; }
+  editTodo = t || null;
+  $("#todoTitle").textContent = t ? "Edit my to-do" : "My own to-do";
+  $("#tTitle").value = t?.title || ""; $("#tDue").value = t?.due || "";
+  $("#tUrgent").value = t?.urgent ? "Yes" : "No"; $("#tNotes").value = t?.notes || "";
+  $("#tDelete").classList.toggle("hidden", !t);
+  $("#todoDlg").showModal();
+}
+$("#addBtn").addEventListener("click", () => openTodo(null));
+$("#tCancel").addEventListener("click", () => $("#todoDlg").close());
+$("#tDelete").addEventListener("click", () => {
+  if (!editTodo || !confirm("Delete this to-do?")) return;
+  todos = todos.filter(x => x.id !== editTodo.id); saveTodos(); $("#todoDlg").close(); render(); toast("🗑️ Deleted");
+});
+$("#todoForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const title = $("#tTitle").value.trim(); if (!title) return;
+  const data = {title, due: $("#tDue").value, urgent: $("#tUrgent").value === "Yes", notes: $("#tNotes").value.trim()};
+  if (editTodo) Object.assign(editTodo, data);
+  else todos.push(Object.assign({kind:"todo", id:"todo-"+Date.now().toString(36), owner:me, done:false, chapter:title, allocations:[me], created:new Date().toISOString()}, data));
+  todos.forEach(t => { t.chapter = t.title; });
+  saveTodos(); $("#todoDlg").close(); render(); toast(editTodo ? "💾 Saved" : "✨ To-do added!");
+});
+
+/* ---------------- settings ---------------- */
+$("#settingsBtn").addEventListener("click", () => {
+  $("#sGet").value = cfg.getUrl; $("#sDone").value = cfg.completeUrl; $("#sRefresh").value = cfg.refreshMinutes;
+  $("#setDlg").showModal();
+});
+$("#setCancel").addEventListener("click", () => $("#setDlg").close());
+$("#setForm").addEventListener("submit", e => {
+  e.preventDefault();
+  cfg.getUrl = $("#sGet").value.trim(); cfg.completeUrl = $("#sDone").value.trim();
+  cfg.refreshMinutes = Math.max(0, parseInt($("#sRefresh").value || "0", 10));
+  localStorage.setItem(LS.cfg, JSON.stringify({getUrl:cfg.getUrl, completeUrl:cfg.completeUrl, refreshMinutes:cfg.refreshMinutes}));
+  $("#setDlg").close(); startTimer(); load(); toast("⚙️ Settings saved");
+});
+
+/* ---------------- misc ---------------- */
+$("#meSelect").innerHTML = `<option value="">— choose —</option>` + cfg.team.map(n => `<option${n===me?" selected":""}>${esc(n)}</option>`).join("");
+$("#meSelect").addEventListener("change", e => { me = e.target.value; localStorage.setItem(LS.me, me); render(); if (me) toast("👋 Hi " + first(me) + "!"); });
+$("#tabs").addEventListener("click", e => {
+  const b = e.target.closest(".tab"); if (!b) return;
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === b));
+  view = b.dataset.view; render();
+});
+["#search","#filterService","#filterUrgent"].forEach(s => $(s).addEventListener("input", render));
+$("#refreshBtn").addEventListener("click", () => load());
+function startTimer(){ clearInterval(refreshTimer); if (isLive() && cfg.refreshMinutes > 0) refreshTimer = setInterval(() => load(true), cfg.refreshMinutes*60000); }
+
+let toastT;
+function toast(m){ const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2800); }
+function confetti(){
+  const cv = $("#confetti"), ctx = cv.getContext("2d");
+  cv.width = innerWidth; cv.height = innerHeight;
+  const bits = Array.from({length:170}, () => ({x:innerWidth/2, y:innerHeight/3, vx:(Math.random()-.5)*16, vy:Math.random()*-14-4,
+    s:Math.random()*8+5, c:CONF_COLOURS[Math.floor(Math.random()*CONF_COLOURS.length)], r:Math.random()*6, vr:(Math.random()-.5)*.4}));
+  let f = 0;
+  (function tick(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    bits.forEach(b => { b.vy += .4; b.x += b.vx; b.y += b.vy; b.r += b.vr;
+      ctx.save(); ctx.translate(b.x,b.y); ctx.rotate(b.r); ctx.fillStyle = b.c; ctx.fillRect(-b.s/2,-b.s/4,b.s,b.s/2); ctx.restore(); });
+    if (++f < 140) requestAnimationFrame(tick); else ctx.clearRect(0,0,cv.width,cv.height);
+  })();
+}
+
+$("#listLink").href = cfg.listUrl + "/AllItems.aspx";
+$("#filterService").innerHTML += cfg.services.map(s => `<option value="${esc(s)}">${(SERVICE_STYLE[s]||{}).emoji||"📄"} ${esc(s)}</option>`).join("");
+startTimer(); load();
+</script>
+</body>
+</html>
