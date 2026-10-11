@@ -319,9 +319,11 @@ async function load(silent){
   }
   if (!silent) setSync("🔄 Syncing…");
   try{
-    const r = await fetch(cfg.getUrl, {method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"});
+    const r = await fetch(cfg.getUrl, {method:"POST"});
     if (!r.ok) throw new Error("HTTP " + r.status);
-    const data = await r.json();
+    const txt = await r.text();
+    let data;
+    try { data = JSON.parse(txt); } catch { throw new Error("NOTJSON"); }
     const list = Array.isArray(data) ? data : (data.tasks || data.value || []);
     const fresh = list.map(normalise);
     // keep anything we've just ticked off showing as done until SharePoint catches up
@@ -330,8 +332,10 @@ async function load(silent){
     setSync("🟢 Synced " + new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}));
   }catch(e){
     console.error(e);
-    setSync("🔴 Sync failed");
-    toast("😬 Couldn't reach SharePoint – check the flow URLs in ⚙️");
+    const why = explain(e, "Get reviews");
+    setSync("🔴 Sync failed – " + why.short);
+    $("#syncState").title = why.long;
+    toast("😬 " + why.long);
   }
   render();
 }
@@ -348,18 +352,30 @@ async function markComplete(id){
     pending.delete(id); return;
   }
   try{
-    const r = await fetch(cfg.completeUrl, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({id: Number(id)})});
+    const r = await fetch(cfg.completeUrl + (cfg.completeUrl.includes("?") ? "&" : "?") + "id=" + encodeURIComponent(id), {method:"POST"});
     if (!r.ok) throw new Error("HTTP " + r.status);
     toast("✅ Marked complete in SharePoint");
     setTimeout(() => { pending.delete(id); }, 60000);
   }catch(e){
     console.error(e);
     pending.delete(id); t.done = false; render();
-    setSync("🔴 Save failed");
-    toast("😬 Couldn't update SharePoint – the task is still open");
+    const why = explain(e, "Mark complete");
+    setSync("🔴 Save failed – " + why.short);
+    $("#syncState").title = why.long;
+    toast("😬 Still open in SharePoint. " + why.long);
   }
 }
-function setSync(s){ $("#syncState").textContent = s; }
+function setSync(s){ $("#syncState").textContent = s; $("#syncState").title = ""; }
+function explain(e, flow){
+  const m = String(e && e.message || e);
+  if (m === "NOTJSON") return {short:"bad reply", long:`The "${flow}" flow replied, but not with the review data. Check its Response action body.`};
+  const code = (m.match(/HTTP (\d+)/) || [])[1];
+  if (code === "401" || code === "403") return {short:"access denied (" + code + ")", long:`The "${flow}" flow refused the request. Set its trigger's "Who can trigger the flow?" to Anyone, then save the flow.`};
+  if (code === "404") return {short:"flow not found", long:`The "${flow}" URL wasn't recognised. Re-copy it from the trigger after saving, and check the flow is turned on.`};
+  if (code === "400") return {short:"bad request (400)", long:`The "${flow}" flow rejected the request. Remove any Request Body JSON Schema from its trigger.`};
+  if (code) return {short:"flow error (" + code + ")", long:`The "${flow}" flow ran but failed. Open its run history in Power Automate to see which step went red.`};
+  return {short:"blocked", long:`The browser couldn't read the reply from the "${flow}" flow. Usually this means the Response action is missing the Access-Control-Allow-Origin header, or the flow failed before reaching its Response. Check the flow's run history.`};
+}
 
 /* ---------------- own to-dos (this browser only) ---------------- */
 const saveTodos = () => localStorage.setItem(LS.todos, JSON.stringify(todos));
