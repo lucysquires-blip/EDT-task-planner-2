@@ -118,6 +118,19 @@ dialog::backdrop{background:rgba(30,20,70,.55);backdrop-filter:blur(3px)}
 .local{--tc:#8ac926}
 .badge-local{background:#eaf7d6;color:#3d6b00}
 .done-strip{opacity:.7}
+#lock{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:20px;
+  background:linear-gradient(135deg,#7c4dff,#ff4fa3 55%,#ff9f1c)}
+#lock .card{background:var(--card);color:var(--ink);border-radius:26px;box-shadow:0 30px 80px rgba(0,0,0,.35);width:min(420px,100%);padding:30px 28px;text-align:center;animation:pop .3s ease-out}
+#lock .big{font-size:56px;display:block;margin-bottom:6px;animation:bob 3s ease-in-out infinite}
+#lock h2{margin:0 0 6px;font-size:22px}
+#lock p{margin:0 0 18px;color:var(--muted);font-size:14px;line-height:1.5}
+#lock input{width:100%;border:2px solid var(--line);border-radius:14px;padding:12px 14px;font:inherit;background:var(--bg);color:var(--ink);text-align:center}
+#lock input.pin{font-size:28px;letter-spacing:10px;font-weight:800}
+#lock .btn{width:100%;margin-top:12px;padding:12px}
+#lock .msg{min-height:20px;margin-top:12px;font-size:13px;font-weight:700;color:var(--red)}
+#lock .msg.ok{color:#137a70}
+#lock .linkbtn{background:none;border:0;color:var(--blue);margin-top:10px;font-weight:700}
+body.locked > header, body.locked > main{filter:blur(8px);pointer-events:none;user-select:none}
 </style>
 </head>
 <body>
@@ -131,6 +144,7 @@ dialog::backdrop{background:rgba(30,20,70,.55);backdrop-filter:blur(3px)}
   <a class="hbtn" id="listLink" target="_blank" rel="noopener">📋 Open list</a>
   <div class="who"><span>🙋 I am</span><select id="meSelect" aria-label="Who are you?"></select></div>
   <button class="hbtn" id="settingsBtn" type="button" aria-label="Settings">⚙️</button>
+  <button class="hbtn hidden" id="signOutBtn" type="button" title="Sign out">🔒 Sign out</button>
 </header>
 
 <main>
@@ -208,6 +222,21 @@ dialog::backdrop{background:rgba(30,20,70,.55);backdrop-filter:blur(3px)}
 
 <div class="toast" id="toast"></div>
 
+<!-- Team PIN lock screen -->
+<div id="lock" class="hidden" role="dialog" aria-modal="true" aria-labelledby="lockTitle">
+  <div class="card">
+    <form id="lockForm">
+      <span class="big">🔐</span>
+      <h2 id="lockTitle">EDT Task Planner</h2>
+      <p>Enter your work email and the team PIN. You'll only need to do this once on this browser.</p>
+      <input id="lockEmail" type="email" autocomplete="email" placeholder="firstname.lastname@fromcounsel.com" required aria-label="Work email">
+      <input id="lockPin" class="pin" type="password" autocomplete="current-password" placeholder="Team PIN" required aria-label="Team PIN" style="margin-top:10px">
+      <button class="btn primary" id="lockGo" type="submit">🔓 Unlock</button>
+    </form>
+    <div class="msg" id="lockMsg" role="status"></div>
+  </div>
+</div>
+
 <script>
 /* =====================================================================
    CONFIG — paste your two Power Automate HTTP URLs here (or use ⚙️).
@@ -216,8 +245,12 @@ const DEFAULT_CONFIG = {
   getUrl: "https://defaultaabefb0b581d4b7386832624c27e52.9e.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/11/workflows/6108f18343bf494dae0da19fbdbe4e79/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=uTQfTPCD_8655mMI5KeoDWt2-WZBfved96NXRYWfqsw",        // Flow 1 "EDT Planner – Get reviews"
   completeUrl: "https://defaultaabefb0b581d4b7386832624c27e52.9e.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/09/workflows/752d8185bf144ca8970effafb280e96b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=3W74h_uGkCCZK_6gAtmf6E0VlbEbSWa0_OdjGBiX5Os",   // Flow 2 "EDT Planner – Mark complete"
   allocUrl: "https://defaultaabefb0b581d4b7386832624c27e52.9e.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/12/workflows/6219090a03944cf3ac731826e9dec5ba/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=FRqk2XtXAIZIvOCMoXwxZumTPyKVXDIMrRdbSq6Z4HI",      // Flow 3 "EDT Planner – Allocate"
+  // One-time PIN sign-in. Fill BOTH to switch the PIN lock on.
+  // Team PIN lock. NEVER put the PIN itself in this file – it lives only in the flows.
+  requirePin: true,
+  emailDomain: "fromcounsel.com",
   refreshMinutes: 2,
-  listUrl: "https://chanceryventures.sharepoint.com/Content%20Team/Lists/Content%20reviews",
+  listUrl: "https://chanceryventures.sharepoint.com/sites/Editorial/Lists/Content%20reviews",
   spHost: "https://chanceryventures.sharepoint.com",
   // Choices in the list's "Allocations" column
   team: ["Fadi BouHadir","Jake Widjaya","Louise Heath","Janelle Lau","Patrick McGarrahan","Nikita Kandola","Rebecca Liesse",
@@ -227,7 +260,7 @@ const DEFAULT_CONFIG = {
 };
 
 /* ---------------- state ---------------- */
-const LS = { cfg:"edt.config", me:"edt.me", todos:"edt.todos", demo:"edt.demo" };
+const LS = { cfg:"edt.config", me:"edt.me", todos:"edt.todos", demo:"edt.demo", session:"edt.session" };
 const saved = JSON.parse(localStorage.getItem(LS.cfg) || "{}");
 const cfg = Object.assign({}, DEFAULT_CONFIG);
 ["getUrl","completeUrl","allocUrl","refreshMinutes"].forEach(k => { if (saved[k] !== undefined && saved[k] !== "") cfg[k] = saved[k]; });
@@ -324,7 +357,7 @@ async function load(silent){
   }
   if (!silent) setSync("🔄 Syncing…");
   try{
-    const r = await fetch(cfg.getUrl, {method:"POST"});
+    const r = await api(cfg.getUrl);
     if (!r.ok) throw new Error("HTTP " + r.status);
     const txt = await r.text();
     let data;
@@ -344,6 +377,7 @@ async function load(silent){
     setSync("🟢 Synced " + new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}));
   }catch(e){
     console.error(e);
+    if (pinEnabled() && isAuthError(e)) { signOut("Your session has ended. Please sign in again."); return; }
     const why = explain(e, "Get reviews");
     setSync("🔴 Sync failed – " + why.short);
     $("#syncState").title = why.long;
@@ -364,13 +398,14 @@ async function markComplete(id){
     pending.delete(id); return;
   }
   try{
-    const r = await fetch(cfg.completeUrl + (cfg.completeUrl.includes("?") ? "&" : "?") + "id=" + encodeURIComponent(id), {method:"POST"});
+    const r = await api(cfg.completeUrl, {id});
     if (!r.ok) throw new Error("HTTP " + r.status);
     toast("✅ Marked complete in SharePoint");
     setTimeout(() => { pending.delete(id); }, 60000);
   }catch(e){
     console.error(e);
     pending.delete(id); t.done = false; render();
+    if (pinEnabled() && isAuthError(e)) { signOut("Your session has ended. Please sign in again."); return; }
     const why = explain(e, "Mark complete");
     setSync("🔴 Save failed – " + why.short);
     $("#syncState").title = why.long;
@@ -393,14 +428,14 @@ async function allocate(id, mode){
     localStorage.setItem(LS.demo, JSON.stringify(raw)); return;
   }
   try{
-    const url = cfg.allocUrl + (cfg.allocUrl.includes("?") ? "&" : "?") + "id=" + encodeURIComponent(id) + "&alloc=" + encodeURIComponent(next.join(";"));
-    const r = await fetch(url, {method:"POST"});
+    const r = await api(cfg.allocUrl, {id, alloc: next.join(";")});
     if (!r.ok) throw new Error("HTTP " + r.status);
     pendingAlloc.set(id, {list: next, until: Date.now() + 120000});
     toast(mode === "release" ? "↩️ Released in SharePoint" : "✅ Allocated to you in SharePoint");
   }catch(e){
     console.error(e);
     t.allocations = before; render();
+    if (pinEnabled() && isAuthError(e)) { signOut("Your session has ended. Please sign in again."); return; }
     const why = explain(e, "Allocate");
     setSync("🔴 Save failed – " + why.short);
     $("#syncState").title = why.long;
@@ -408,6 +443,70 @@ async function allocate(id, mode){
   }
 }
 function setSync(s){ $("#syncState").textContent = s; $("#syncState").title = ""; }
+
+/* ---------------- team PIN sign-in ---------------- */
+// The page never knows the right PIN. It sends what the person typed with every
+// request, and each Power Automate flow checks it before returning or changing anything.
+const pinEnabled = () => !!cfg.requirePin && isLive();
+function getSession(){
+  try{ const s = JSON.parse(localStorage.getItem(LS.session) || "null"); return s && s.email && s.pin ? s : null; }
+  catch{ return null; }
+}
+const addQuery = (url, params) => url + (url.includes("?") ? "&" : "?") +
+  Object.entries(params).map(([k,v]) => k + "=" + encodeURIComponent(v)).join("&");
+function api(url, params = {}){
+  const s = getSession();
+  if (s) params = Object.assign({email: s.email, pin: s.pin}, params);
+  return fetch(Object.keys(params).length ? addQuery(url, params) : url, {method:"POST"});
+}
+function isAuthError(e){ return /HTTP 40[13]/.test(String(e && e.message || e)); }
+const normName = s => (s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z]/g,"");
+function nameFromEmail(email){
+  const local = normName((email||"").split("@")[0]);
+  return cfg.team.find(n => normName(n) === local) || "";
+}
+function lockMsg(text, ok){ const m = $("#lockMsg"); m.textContent = text; m.classList.toggle("ok", !!ok); }
+function showLock(message){
+  document.body.classList.add("locked");
+  $("#lock").classList.remove("hidden");
+  $("#lockPin").value = "";
+  lockMsg(message || "");
+  clearInterval(refreshTimer);
+  setTimeout(() => ($("#lockEmail").value ? $("#lockPin") : $("#lockEmail")).focus(), 50);
+}
+function hideLock(){
+  document.body.classList.remove("locked");
+  $("#lock").classList.add("hidden");
+  $("#signOutBtn").classList.toggle("hidden", !pinEnabled());
+}
+function signOut(message){
+  localStorage.removeItem(LS.session);
+  reviews = []; render();
+  showLock(message || "You've been signed out.");
+}
+$("#lockForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const email = $("#lockEmail").value.trim().toLowerCase();
+  const pin = $("#lockPin").value.trim();
+  if (!email.endsWith("@" + cfg.emailDomain)){ lockMsg("Please use your @" + cfg.emailDomain + " email."); return; }
+  if (!pin){ lockMsg("Please enter the team PIN."); return; }
+  $("#lockGo").disabled = true; lockMsg("Checking…", true);
+  localStorage.setItem(LS.session, JSON.stringify({email, pin}));
+  try{
+    const r = await api(cfg.getUrl);
+    if (r.status === 401 || r.status === 403){ localStorage.removeItem(LS.session); lockMsg("❌ That PIN isn't right. Check with Lucy for the current team PIN."); return; }
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const guess = nameFromEmail(email);
+    if (guess){ me = guess; localStorage.setItem(LS.me, me); $("#meSelect").value = me; }
+    hideLock(); confetti(); toast("🔓 Welcome" + (me ? ", " + first(me) : "") + "!");
+    startTimer(); load();
+  }catch(err){
+    console.error(err);
+    localStorage.removeItem(LS.session);
+    lockMsg("😬 Couldn't reach the planner right now. Please try again in a minute.");
+  }finally{ $("#lockGo").disabled = false; }
+});
+$("#signOutBtn").addEventListener("click", () => signOut());
 function explain(e, flow){
   const m = String(e && e.message || e);
   if (m === "NOTJSON") return {short:"bad reply", long:`The "${flow}" flow replied, but not with the review data. Check its Response action body.`};
@@ -670,7 +769,8 @@ function confetti(){
 
 $("#listLink").href = cfg.listUrl + "/AllItems.aspx";
 $("#filterService").innerHTML += cfg.services.map(s => `<option value="${esc(s)}">${(SERVICE_STYLE[s]||{}).emoji||"📄"} ${esc(s)}</option>`).join("");
-startTimer(); load();
+if (pinEnabled() && !getSession()) showLock();
+else { hideLock(); startTimer(); load(); }
 </script>
 </body>
 </html>
